@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSS Search — веб-версия OSINT username бота</title>
+<meta name="description" content="Веб-версия Telegram-бота OSS: поиск юзернейма по 480+ сайтам на базе базы данных Sherlock Project, прямо в браузере, без сервера.">
+<link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="bg-grid" aria-hidden="true"></div>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <div class="brand">
+      <img src="assets/img/favicon.svg" alt="" class="brand-icon">
+      <div>
+        <h1>OSS <span class="accent">Search</span></h1>
+        <p class="tagline">Веб-версия Telegram OSINT-бота на базе <a href="https://github.com/sherlock-project/sherlock" target="_blank" rel="noopener">Sherlock Project</a></p>
+      </div>
+    </div>
+    <nav class="header-links">
+      <a href="https://github.com/cat228608/OpenSoucesSearcherUsername" target="_blank" rel="noopener">GitHub репозиторий ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="search-panel" aria-label="Поиск юзернейма">
+    <form id="search-form" autocomplete="off">
+      <label for="username" class="visually-hidden">Юзернейм</label>
+      <div class="search-row">
+        <input
+          id="username"
+          name="username"
+          type="text"
+          inputmode="text"
+          placeholder="Введите юзернейм, например: torvalds"
+          minlength="3"
+          maxlength="30"
+          required
+        >
+        <button type="submit" id="search-btn" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="21" y1="21" x2="15.5" y2="15.5"/></svg>
+          Искать
+        </button>
+      </div>
+      <p id="username-hint" class="hint">Только буквы, цифры и символы <code>._-</code>, от 3 до 30 символов — как в оригинальном боте.</p>
+    </form>
+
+    <div class="mode-row">
+      <label class="switch">
+        <input type="checkbox" id="deep-mode">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">
+          Экспериментальная проверка существования аккаунтов (через публичный CORS-прокси)
+        </span>
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="nsfw-toggle">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">Показывать сайты 18+</span>
+      </label>
+      <span class="sites-total">База: <strong id="sites-count">…</strong> сайтов (данные Sherlock)</span>
+    </div>
+
+    <p class="disclaimer" id="deep-mode-warning" hidden>
+      ⚠️ Проверка выполняется <b>прямо в браузере</b> через публичный CORS-прокси (allorigins.win), т.к. GitHub Pages — статический хостинг без бэкенда.
+      Это экспериментальный режим: часть сайтов может определяться неверно (ложные срабатывания), прокси может быть медленным или временно недоступным.
+      Используйте только для проверки собственных аккаунтов или в рамках законного OSINT-исследования.
+    </p>
+  </section>
+
+  <section class="results-panel" id="results-panel" hidden aria-label="Результаты поиска">
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-value" id="stat-total">0</span><span class="stat-label">всего</span></div>
+      <div class="stat found"><span class="stat-value" id="stat-found">0</span><span class="stat-label">найдено</span></div>
+      <div class="stat unknown"><span class="stat-value" id="stat-unknown">0</span><span class="stat-label">не удалось проверить</span></div>
+      <div class="stat progress-stat">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <span class="stat-label" id="progress-label">готово</span>
+      </div>
+      <button class="btn btn-ghost" id="cancel-btn" hidden>Остановить</button>
+      <button class="btn btn-ghost" id="export-btn" disabled>⬇ Скачать отчёт (.txt)</button>
+    </div>
+
+    <div class="filter-row">
+      <input type="text" id="filter-input" placeholder="Фильтр по названию сайта…" class="filter-input">
+      <div class="filter-chips" role="group" aria-label="Фильтр по статусу">
+        <button class="chip active" data-filter="all">Все</button>
+        <button class="chip" data-filter="found">Найдено</button>
+        <button class="chip" data-filter="notfound">Не найдено</button>
+        <button class="chip" data-filter="unknown">Неизвестно</button>
+      </div>
+      <span class="cache-badge" id="cache-badge" hidden></span>
+    </div>
+
+    <ul class="results-grid" id="results-grid"></ul>
+    <p class="empty-state" id="empty-state" hidden>Ничего не найдено по этому фильтру.</p>
+  </section>
+
+  <section class="about-panel">
+    <h2>Как это работает</h2>
+    <div class="about-grid">
+      <div class="about-card">
+        <h3>🔗 Быстрый режим</h3>
+        <p>Мгновенно генерирует прямые ссылки на профиль юзернейма для каждого из ~480 сайтов из базы Sherlock. Работает всегда, без сети и без ограничений — просто открывайте ссылки и проверяйте глазами.</p>
+      </div>
+      <div class="about-card">
+        <h3>🧪 Экспериментальная проверка</h3>
+        <p>Пытается определить, существует ли аккаунт, повторяя логику Sherlock (проверка кода ответа, текста страницы или редиректа) через публичный CORS-прокси, потому что браузер не может напрямую обращаться к большинству сайтов из-за политики CORS.</p>
+      </div>
+      <div class="about-card">
+        <h3>💾 Кэш и отчёт</h3>
+        <p>Результаты сохраняются в <code>localStorage</code> вашего браузера — как файловый кэш в оригинальном боте — и их можно скачать в виде <code>.txt</code>-отчёта со списком найденных ссылок.</p>
+      </div>
+    </div>
+    <p class="ethics">
+      Используйте инструмент только легально: для проверки собственных аккаунтов, по согласию владельца или в рамках правомерного OSINT-расследования.
+      Разработчики не несут ответственности за неправомерное использование.
+    </p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      Сделано на основе <a href="https://github.com/sherlock-project/sherlock" target="_blank" rel="noopener">Sherlock Project</a> (MIT) ·
+      Веб-версия Telegram-бота <a href="https://github.com/cat228608/OpenSoucesSearcherUsername" target="_blank" rel="noopener">OpenSoucesSearcherUsername</a> ·
+      Работает полностью в браузере, без сервера.
+    </p>
+  </div>
+</footer>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>
